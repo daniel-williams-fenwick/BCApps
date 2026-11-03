@@ -190,6 +190,25 @@ page 9886 "Effective Permissions Overview"
                     CurrPage.Update(false);
                 end;
             }
+            action(ExportEffectivePermissions)
+            {
+                ApplicationArea = All;
+                Caption = 'Effective Permissions (Excel)';
+                Image = ExportToExcel;
+                ToolTip = 'Run the effective permissions Excel report using the current filters.';
+
+                trigger OnAction()
+                var
+                    TempPermissionView: Record "Effective Permission Buffer";
+                    EffectivePermissionsReport: Report "Effective Permissions Overview";
+                begin
+                    TempPermissionView.CopyFilters(Rec);
+                    TempPermissionView.SetRange(Company);
+                    EffectivePermissionsReport.SetTableView(TempPermissionView);
+                    EffectivePermissionsReport.SetCompanyFilter(CompanyFilter);
+                    EffectivePermissionsReport.RunModal();
+                end;
+            }
             action(PermissionSets)
             {
                 ApplicationArea = All;
