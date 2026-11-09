@@ -21,7 +21,7 @@ page 9886 "Effective Permissions Overview"
     LinksAllowed = false;
     ModifyAllowed = false;
     SourceTable = "Effective Permission Buffer";
-    AboutTitle = 'About Effective Permission Overview';
+    AboutTitle = 'About Effective Permissions Overview';
     AboutText = 'Audit the effective permissions each user has across objects in your system, as well as which assigned permission set contributed to each effective permission. Effective permissions show the final access to objects and data, helping you verify access and troubleshoot permission issues.';
 
     layout

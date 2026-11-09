@@ -14,7 +14,8 @@ report 8314 "Effective Permissions Overview"
     {
         dataitem(EffectivePermission; "Effective Permission Buffer")
         {
-            RequestFilterFields = "User Name", "Object Type", "Object ID", "Read Permission", "Insert Permission", "Modify Permission", "Delete Permission";
+            RequestFilterFields = "User Name", "Object Type", "Object ID", "Read Permission", "Insert Permission", "Modify Permission",
+                                    "Delete Permission", "Execute Permission";
 
             column(Company; Company)
             {
@@ -168,13 +169,15 @@ report 8314 "Effective Permissions Overview"
 
     // Ensures Layout Filter Headings are up to date
     local procedure UpdateRequestPageFilterValues()
+    var
+        FilterHeadingLbl: Label '%1: %2', Comment = '%1 = Table/Field Caption, %2 = Filter Value';
     begin
         EffectivePermissionsFilter := EffectivePermission.GetFilters();
         if EffectivePermissionsFilter <> '' then
-            EffectivePermissionsFilterHeading := EffectivePermission.TableCaption + ': ' + EffectivePermissionsFilter
+            EffectivePermissionsFilterHeading := StrSubstNo(FilterHeadingLbl, EffectivePermission.TableCaption, EffectivePermissionsFilter)
         else
             EffectivePermissionsFilterHeading := '';
         if CompanyFilter <> '' then
-            CompanyFilterHeading := EffectivePermission.FieldCaption(Company) + ': ' + CompanyFilter;
+            CompanyFilterHeading := StrSubstNo(FilterHeadingLbl, EffectivePermission.FieldCaption(Company), CompanyFilter);
     end;
 }
