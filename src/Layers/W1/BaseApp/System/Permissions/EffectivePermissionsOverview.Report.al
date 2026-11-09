@@ -61,8 +61,13 @@ report 8314 "Effective Permissions Overview"
             }
 
             trigger OnPreDataItem()
+            var
+                ObjTypeFilter: Option " ","Table Data","Table",,"Report",,"Codeunit","XMLport",MenuSuite,"Page","Query",System;
             begin
-                LoadData();
+                if EffectivePermission.GetFilter("Object Type") <> '' then
+                    ObjTypeFilter := EffectivePermission."Object Type";
+
+                EffectivePermissionsMgt.LoadData(EffectivePermission, TempUser, EffectivePermission.GetFilter("User Name"), ObjTypeFilter, EffectivePermission.GetFilter("Object ID"), CompanyFilter);
             end;
         }
     }
@@ -118,7 +123,7 @@ report 8314 "Effective Permissions Overview"
         {
             Caption = 'Effective Permissions Overview Excel';
             Type = Excel;
-            LayoutFile = './System/Permissions/EffectivePermissionsOverview.xlsx';
+            LayoutFile = './Inventory/Reports/EffectivePermissionsOverview.xlsx';
             Summary = 'Built in layout for the Effective Permissions Overview Excel report.';
         }
     }
@@ -162,82 +167,6 @@ report 8314 "Effective Permissions Overview"
     procedure SetCompanyFilter(NewCompanyFilter: Text[30])
     begin
         CompanyFilter := NewCompanyFilter;
-    end;
-
-    local procedure LoadUsers()
-    var
-        User: Record User;
-        UserProperty: Record "User Property";
-        EnvironmentInfo: Codeunit "Environment Information";
-        UserSelection: Codeunit "User Selection";
-        AzureADUserManagement: Codeunit "Azure AD User Management";
-        IsSaaS: Boolean;
-    begin
-        IsSaaS := EnvironmentInfo.IsSaaS();
-        TempUser.Reset();
-        TempUser.DeleteAll();
-        UserProperty.SetLoadFields("Authentication Object ID");
-        UserSelection.FilterSystemUserAndGroupUsers(User);
-        User.SetLoadFields("User Security ID", "User Name");
-        if User.FindSet() then begin
-            repeat
-                if IsSaaS then begin
-                    if not AzureADUserManagement.IsUserDelegated(User."User Security ID") then begin
-                        if (not UserProperty.Get(User."User Security ID")) or (UserProperty."Authentication Object ID" = '') then begin
-                            continue;
-                        end;
-                    end;
-                end;
-                TempUser."User Security ID" := User."User Security ID";
-                TempUser."User Name" := User."User Name";
-                TempUser.Insert();
-            until User.Next() = 0;
-        end;
-    end;
-
-    local procedure LoadData()
-    var
-        AllObj: Record AllObj;
-        TempPermission: Record Permission temporary;
-    begin
-        LoadUsers();
-        TempUser.Reset();
-        TempUser.SetFilter("User Name", EffectivePermission.GetFilter("User Name"));
-        if TempUser.IsEmpty() then begin
-            exit;
-        end;
-
-        AllObj.SetLoadFields("Object Type", "Object ID", "Object Name");
-        if EffectivePermission.GetFilter("Object Type") <> '' then
-            EffectivePermission.CopyFilter("Object Type", AllObj."Object Type");
-        AllObj.SetFilter("Object ID", EffectivePermission.GetFilter("Object ID"));
-        if not AllObj.FindSet() then begin
-            exit;
-        end;
-        repeat
-            TempUser.FindSet();
-            repeat
-                EffectivePermissionsMgt.PopulatePermissionRecordWithEffectivePermissionsForObject(
-                    TempPermission, TempUser."User Security ID", CompanyFilter, AllObj."Object Type", AllObj."Object ID");
-
-                EffectivePermission.Init();
-                EffectivePermission.Company := CompanyFilter;
-                EffectivePermission."User Name" := TempUser."User Name";
-                EffectivePermission."User Security ID" := TempUser."User Security ID";
-                EffectivePermission."Object Type" := AllObj."Object Type";
-                EffectivePermission."Object ID" := AllObj."Object ID";
-                EffectivePermission."Object Name" := AllObj."Object Name";
-                EffectivePermission."Read Permission" := TempPermission."Read Permission";
-                EffectivePermission."Insert Permission" := TempPermission."Insert Permission";
-                EffectivePermission."Modify Permission" := TempPermission."Modify Permission";
-                EffectivePermission."Delete Permission" := TempPermission."Delete Permission";
-                EffectivePermission."Execute Permission" := TempPermission."Execute Permission";
-                if EffectivePermission.Insert() then begin
-                end;
-            until TempUser.Next() = 0;
-        until AllObj.Next() = 0;
-        if EffectivePermission.FindFirst() then begin
-        end;
     end;
 
     // Ensures Layout Filter Headings are up to date
