@@ -969,7 +969,7 @@ codeunit 9852 "Effective Permissions Mgt."
         repeat
             TempUser.FindSet();
             repeat
-                EffectivePermissionsMgt.PopulatePermissionRecordWithEffectivePermissionsForObject(
+                PopulatePermissionRecordWithEffectivePermissionsForObject(
                     TempPermission, TempUser."User Security ID", CompanyFilter, AllObj."Object Type", AllObj."Object ID");
 
                 EffectivePermission.Init();

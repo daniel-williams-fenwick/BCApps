@@ -1,9 +1,6 @@
 namespace System.Security.AccessControl;
 
-using System.Azure.Identity;
 using System.Environment;
-using System.Reflection;
-using System.Security.User;
 
 report 8314 "Effective Permissions Overview"
 {

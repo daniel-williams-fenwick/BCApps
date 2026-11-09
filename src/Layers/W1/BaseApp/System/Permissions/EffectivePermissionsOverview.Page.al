@@ -4,7 +4,6 @@
 // ------------------------------------------------------------------------------------------------
 namespace System.Security.AccessControl;
 
-using System.Azure.Identity;
 using System.Environment;
 using System.Reflection;
 using System.Security.User;
