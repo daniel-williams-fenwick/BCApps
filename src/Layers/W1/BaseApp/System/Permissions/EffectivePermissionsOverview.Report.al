@@ -121,7 +121,7 @@ report 8314 "Effective Permissions Overview"
         {
             Caption = 'Effective Permissions Overview Excel';
             Type = Excel;
-            LayoutFile = './Inventory/Reports/EffectivePermissionsOverview.xlsx';
+            LayoutFile = './System/Permissions/EffectivePermissionsOverview.xlsx';
             Summary = 'Built in layout for the Effective Permissions Overview Excel report.';
         }
     }
