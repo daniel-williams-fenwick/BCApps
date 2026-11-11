@@ -917,7 +917,7 @@ codeunit 9852 "Effective Permissions Mgt."
         AzureADUserManagement: Codeunit "Azure AD User Management";
         IsSaaS: Boolean;
     begin
-        IsSaaS := EnvironmentInfo.IsSaaS();
+        IsSaaS := EnvironmentInfo.IsSaaSInfrastructure();
         TempUser.Reset();
         TempUser.DeleteAll();
         UserProperty.SetLoadFields("Authentication Object ID");
