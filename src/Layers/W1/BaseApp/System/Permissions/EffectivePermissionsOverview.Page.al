@@ -4,7 +4,6 @@
 // ------------------------------------------------------------------------------------------------
 namespace System.Security.AccessControl;
 
-using System.Azure.Identity;
 using System.Environment;
 using System.Reflection;
 using System.Security.User;
@@ -22,7 +21,7 @@ page 9886 "Effective Permissions Overview"
     LinksAllowed = false;
     ModifyAllowed = false;
     SourceTable = "Effective Permission Buffer";
-    AboutTitle = 'About Effective Permission Overview';
+    AboutTitle = 'About Effective Permissions Overview';
     AboutText = 'Audit the effective permissions each user has across objects in your system, as well as which assigned permission set contributed to each effective permission. Effective permissions show the final access to objects and data, helping you verify access and troubleshoot permission issues.';
 
     layout
@@ -194,9 +193,32 @@ page 9886 "Effective Permissions Overview"
                 Image = Refresh;
 
                 trigger OnAction()
+                var
+                    ObjectTypeFilter: Option " ","Table Data","Table",,"Report",,"Codeunit","XMLport",MenuSuite,"Page","Query",System;
                 begin
-                    LoadData();
+                    if ObjTypeFilter <> ObjTypeFilter::" " then
+                        ObjectTypeFilter := ObjTypeFilter - 1;
+                    EffectivePermissionsMgt.LoadData(Rec, TempUser, UserFilter, ObjectTypeFilter, ObjIDFilter, CompanyFilter);
                     CurrPage.Update(false);
+                end;
+            }
+            action(ExportEffectivePermissions)
+            {
+                ApplicationArea = All;
+                Caption = 'Effective Permissions (Excel)';
+                Image = ExportToExcel;
+                ToolTip = 'Run the effective permissions Excel report using the current filters.';
+
+                trigger OnAction()
+                var
+                    TempPermissionView: Record "Effective Permission Buffer";
+                    EffectivePermissionsReport: Report "Effective Permissions Overview";
+                begin
+                    TempPermissionView.CopyFilters(Rec);
+                    TempPermissionView.SetRange(Company);
+                    EffectivePermissionsReport.SetTableView(TempPermissionView);
+                    EffectivePermissionsReport.SetCompanyFilter(CompanyFilter);
+                    EffectivePermissionsReport.RunModal();
                 end;
             }
             action(PermissionSets)
@@ -221,6 +243,7 @@ page 9886 "Effective Permissions Overview"
             group(Category_Process)
             {
                 actionref(Apply_Promoted; Apply) { }
+                actionref(ExportEffectivePermissions_Promoted; ExportEffectivePermissions) { }
                 actionref(PermissionSets_Promoted; PermissionSets) { }
                 actionref(PermissionSetByUser_Promoted; PermissionSetByUser) { }
             }
@@ -245,7 +268,7 @@ page 9886 "Effective Permissions Overview"
         EffectivePermissionsMgt.DisallowViewingEffectivePermissionsForNonAdminUsers(UserSecurityId());
 
         CompanyFilter := CopyStr(CompanyName(), 1, MaxStrLen(CompanyFilter));
-        LoadUsers();
+        EffectivePermissionsMgt.LoadUsers(TempUser);
         ApplyFilters(false);
 
         AuditLog.LogAuditMessage(StrSubstNo(EffectivePermissionsPageOpenLbl, UserSecurityId()), SecurityOperationResult::Success, AuditCategory::ApplicationManagement, 2, 0);
@@ -294,90 +317,5 @@ page 9886 "Effective Permissions Overview"
             Rec.SetRange("Execute Permission", ExecuteFilter - 1);
         if Update then
             CurrPage.Update(false);
-    end;
-
-    local procedure LoadUsers()
-    var
-        User: Record User;
-        UserProperty: Record "User Property";
-        EnvironmentInfo: Codeunit "Environment Information";
-        UserSelection: Codeunit "User Selection";
-        AzureADUserManagement: Codeunit "Azure AD User Management";
-        IsSaaS: Boolean;
-    begin
-        IsSaaS := EnvironmentInfo.IsSaaSInfrastructure();
-        TempUser.Reset();
-        TempUser.DeleteAll();
-        UserProperty.SetLoadFields("Authentication Object ID");
-        UserSelection.FilterSystemUserAndGroupUsers(User);
-        User.SetLoadFields("User Security ID", "User Name");
-        if User.FindSet() then
-            repeat
-                if IsSaaS then
-                    if not AzureADUserManagement.IsUserDelegated(User."User Security ID") then
-                        if (not UserProperty.Get(User."User Security ID")) or (UserProperty."Authentication Object ID" = '') then
-                            continue;
-                TempUser."User Security ID" := User."User Security ID";
-                TempUser."User Name" := User."User Name";
-                TempUser.Insert();
-            until User.Next() = 0;
-    end;
-
-    local procedure LoadData()
-    var
-        AllObj: Record AllObj;
-        TempPermission: Record Permission temporary;
-        Window: Dialog;
-        ProcessCount, TotalCount : Integer;
-        LastUpdateDateTime: DateTime;
-        LoadDataMsg: Label 'Reading Permissions...@1@@@@@';
-    begin
-        LoadUsers();
-        TempUser.Reset();
-        TempUser.SetFilter("User Name", UserFilter);
-        if TempUser.IsEmpty() then
-            exit;
-
-        AllObj.SetLoadFields("Object Type", "Object ID", "Object Name");
-        if ObjTypeFilter <> ObjTypeFilter::" " then
-            AllObj.SetRange("Object Type", ObjTypeFilter - 1);
-        AllObj.SetFilter("Object ID", ObjIDFilter);
-        if not AllObj.FindSet() then
-            exit;
-
-        Window.Open(LoadDataMsg);
-
-        TotalCount := AllObj.Count() * TempUser.Count();
-        LastUpdateDateTime := CurrentDateTime();
-        repeat
-            TempUser.FindSet();
-            repeat
-                EffectivePermissionsMgt.PopulatePermissionRecordWithEffectivePermissionsForObject(
-                    TempPermission, TempUser."User Security ID", CompanyFilter, AllObj."Object Type", AllObj."Object ID");
-
-                Rec.Init();
-                Rec.Company := CompanyFilter;
-                Rec."User Name" := TempUser."User Name";
-                Rec."User Security ID" := TempUser."User Security ID";
-                Rec."Object Type" := AllObj."Object Type";
-                Rec."Object ID" := AllObj."Object ID";
-                Rec."Object Name" := AllObj."Object Name";
-                Rec."Read Permission" := TempPermission."Read Permission";
-                Rec."Insert Permission" := TempPermission."Insert Permission";
-                Rec."Modify Permission" := TempPermission."Modify Permission";
-                Rec."Delete Permission" := TempPermission."Delete Permission";
-                Rec."Execute Permission" := TempPermission."Execute Permission";
-                if Rec.Insert() then;
-
-                ProcessCount += 1;
-                if CurrentDateTime() - LastUpdateDateTime > 1000 then begin
-                    Window.Update(1, Round(ProcessCount * 10000 / TotalCount, 1));
-                    LastUpdateDateTime := CurrentDateTime();
-                end;
-            until TempUser.Next() = 0;
-        until AllObj.Next() = 0;
-        if Rec.FindFirst() then;
-
-        Window.Close();
     end;
 }
