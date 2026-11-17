@@ -18,6 +18,7 @@ codeunit 139400 "Permissions Test"
         SecurityGroupsTestLibrary: Codeunit "Security Groups Test Library";
         MockGraphQueryTestLibrary: Codeunit "MockGraphQuery Test Library";
         LibraryVariableStorage: Codeunit "Library - Variable Storage";
+        LibraryReportDataset: Codeunit "Library - Report Dataset";
         Assert: Codeunit Assert;
         BaseAppID: Codeunit "BaseApp ID";
         PermissionSetNonExistentTxt: Label 'Non-existent';
@@ -663,7 +664,7 @@ codeunit 139400 "Permissions Test"
         TenantPermissionSet: Record "Tenant Permission Set";
         TenantPermission: array[2] of Record "Tenant Permission";
         AccessControl: Record "Access Control";
-        AllObj: Record AllObj;
+        AllObj: array[2] of Record AllObj;
         EnvironmentInfoTestLibrary: Codeunit "Environment Info Test Library";
         EffectivePermOverview: TestPage "Effective Permissions Overview";
     begin
@@ -674,29 +675,18 @@ codeunit 139400 "Permissions Test"
         LibraryPermissions.CreateTenantPermissionSet(TenantPermissionSet, LibraryUtility.GenerateGUID(), NullGuid);
 
         // [GIVEN] Two permissions for the same permission set
-        AllObj.Get(AllObj."Object Type"::Page, Page::"Customer Card");
-        TenantPermission[1].Init();
-        TenantPermission[1]."App ID" := NullGuid;
-        TenantPermission[1]."Role ID" := TenantPermissionSet."Role ID";
-        TenantPermission[1]."Object Type" := AllObj."Object Type";
-        TenantPermission[1]."Object ID" := AllObj."Object ID";
+        AllObj[1].Get(AllObj[1]."Object Type"::Page, Page::"Customer Card");
+        CreateTenantPermission(TenantPermission[1], TenantPermissionSet."Role ID", AllObj[1]);
         TenantPermission[1]."Execute Permission" := TenantPermission[1]."Execute Permission"::Yes;
-        TenantPermission[1].Insert();
-        TenantPermission[2].Init();
-        TenantPermission[2]."App ID" := NullGuid;
-        TenantPermission[2]."Role ID" := TenantPermissionSet."Role ID";
-        TenantPermission[2]."Object Type" := TenantPermission[2]."Object Type"::Page;
-        TenantPermission[2]."Object ID" := Page::"Vendor Card";
+        TenantPermission[1].Modify();
+
+        AllObj[2].Get(TenantPermission[2]."Object Type"::Page, Page::"Vendor Card");
+        CreateTenantPermission(TenantPermission[2], TenantPermissionSet."Role ID", AllObj[2]);
         TenantPermission[2]."Execute Permission" := TenantPermission[2]."Execute Permission"::Yes;
-        TenantPermission[2].Insert();
+        TenantPermission[2].Modify();
 
         // [GIVEN] The permission set is assigned to the current user in the current company
-        AccessControl.Init();
-        AccessControl."User Security ID" := UserSecurityId();
-        AccessControl."Role ID" := TenantPermissionSet."Role ID";
-        AccessControl.Scope := AccessControl.Scope::Tenant;
-        AccessControl."Company Name" := GetCurrentCompanyName();
-        AccessControl.Insert(true);
+        CreateAccessControl(AccessControl, UserSecurityId(), '', TenantPermissionSet."Role ID");
 
         // [WHEN] The effective permissions overview is opened with the user and object filters set
         EffectivePermOverview.OpenEdit();
@@ -708,8 +698,8 @@ codeunit 139400 "Permissions Test"
         // [THEN] Only the filtered permission should be displayed
         Assert.IsTrue(EffectivePermOverview.First(), 'An entry should exist');
         EffectivePermOverview.UserName.AssertEquals(UserId());
-        EffectivePermOverview.ObjectType.AssertEquals(AllObj."Object Type");
-        EffectivePermOverview.ObjectName.AssertEquals(AllObj."Object Name");
+        EffectivePermOverview.ObjectType.AssertEquals(AllObj[1]."Object Type");
+        EffectivePermOverview.ObjectName.AssertEquals(AllObj[1]."Object Name");
         EffectivePermOverview.ExecutePermission.AssertEquals(TenantPermission[1]."Execute Permission");
         Assert.IsFalse(EffectivePermOverview.Next(), 'There should be no more entries');
     end;
@@ -722,35 +712,23 @@ codeunit 139400 "Permissions Test"
         TenantPermissionSet: Record "Tenant Permission Set";
         TenantPermission: array[2] of Record "Tenant Permission";
         AccessControl: Record "Access Control";
-        AllObj: Record AllObj;
+        AllObj: array[2] of Record AllObj;
         EffectivePermOverview: TestPage "Effective Permissions Overview";
     begin
         // [SCENARIO] Object ID AssistEdit filters the effective permissions overview
         // [GIVEN] The current user has permissions for the Customer and Vendor tables
         LibraryPermissions.CreateTenantPermissionSet(TenantPermissionSet, LibraryUtility.GenerateGUID(), NullGuid);
-        AllObj.Get(AllObj."Object Type"::TableData, Database::Customer);
-        TenantPermission[1].Init();
-        TenantPermission[1]."App ID" := NullGuid;
-        TenantPermission[1]."Role ID" := TenantPermissionSet."Role ID";
-        TenantPermission[1]."Object Type" := AllObj."Object Type";
-        TenantPermission[1]."Object ID" := AllObj."Object ID";
+        AllObj[1].Get(AllObj[1]."Object Type"::TableData, Database::Customer);
+        CreateTenantPermission(TenantPermission[1], TenantPermissionSet."Role ID", AllObj[1]);
         TenantPermission[1]."Execute Permission" := TenantPermission[1]."Execute Permission"::Yes;
-        TenantPermission[1].Insert();
-        TenantPermission[2].Init();
-        TenantPermission[2]."App ID" := NullGuid;
-        TenantPermission[2]."Role ID" := TenantPermissionSet."Role ID";
-        TenantPermission[2]."Object Type" := TenantPermission[2]."Object Type"::"Table Data";
-        TenantPermission[2]."Object ID" := Database::Vendor;
+        TenantPermission[1].Modify();
+
+        AllObj[2].Get(AllObj[2]."Object Type"::TableData, Database::Vendor);
+        CreateTenantPermission(TenantPermission[2], TenantPermissionSet."Role ID", AllObj[2]);
         TenantPermission[2]."Execute Permission" := TenantPermission[2]."Execute Permission"::Yes;
         TenantPermission[2].Insert();
 
-        AccessControl.Init();
-        AccessControl."App ID" := NullGuid;
-        AccessControl."Role ID" := TenantPermissionSet."Role ID";
-        AccessControl."User Security ID" := UserSecurityId();
-        AccessControl."Company Name" := GetCurrentCompanyName();
-        AccessControl.Scope := AccessControl.Scope::Tenant;
-        AccessControl.Insert(true);
+        CreateAccessControl(AccessControl, UserSecurityId(), '', TenantPermissionSet."Role ID");
 
         // [WHEN] Customer is selected through AssistEdit
         EffectivePermOverview.OpenEdit();
@@ -761,12 +739,60 @@ codeunit 139400 "Permissions Test"
         EffectivePermOverview.Apply.Invoke();
 
         // [THEN] The selected object ID is applied and all displayed rows match it
-        Assert.AreEqual(Format(AllObj."Object ID"), EffectivePermOverview.ObjIDFilter.Value, 'Object ID filter was not applied.');
+        Assert.AreEqual(Format(AllObj[1]."Object ID"), EffectivePermOverview.ObjIDFilter.Value, 'Object ID filter was not applied.');
         Assert.IsTrue(EffectivePermOverview.First(), 'A permission for the selected object should be displayed.');
         repeat
             EffectivePermOverview.UserName.AssertEquals(UserId());
-            Assert.AreEqual(AllObj."Object Name", EffectivePermOverview.ObjectName.Value, 'Effective permissions overview contains an unexpected object ID.');
+            Assert.AreEqual(AllObj[1]."Object Name", EffectivePermOverview.ObjectName.Value, 'Effective permissions overview contains an unexpected object ID.');
         until not EffectivePermOverview.Next();
+    end;
+
+    [Test]
+    [HandlerFunctions('EffectivePermissionsOverviewRequestPageHandler')]
+    [TransactionModel(TransactionModel::AutoRollback)]
+    procedure EffectivePermissionsOverviewReportContainsUserTenantPermissions()
+    var
+        TenantPermissionSet: Record "Tenant Permission Set";
+        TenantPermission: array[2] of Record "Tenant Permission";
+        EffectivePermissionBuffer: Record "Effective Permission Buffer";
+        AccessControl: Record "Access Control";
+        TestUser: Record User;
+        AllObj: array[2] of Record AllObj;
+        EnvironmentInfoTestLibrary: Codeunit "Environment Info Test Library";
+        RequestPageXML: Text;
+    begin
+        EnvironmentInfoTestLibrary.SetTestabilitySoftwareAsAService(false);
+
+        LibraryPermissions.CreateUser(TestUser, '', false);
+        LibraryPermissions.CreateTenantPermissionSet(TenantPermissionSet, LibraryUtility.GenerateGUID(), NullGuid);
+
+        AllObj[1].Get(AllObj[1]."Object Type"::TableData, Database::"Effective Permission Buffer");
+        CreateTenantPermission(TenantPermission[1], TenantPermissionSet."Role ID", AllObj[1]);
+        TenantPermission[1]."Delete Permission" := TenantPermission[1]."Execute Permission"::" ";
+        TenantPermission[1].Modify();
+
+        AllObj[2].Get(AllObj[2]."Object Type"::Report, Report::"Effective Permissions Overview");
+        CreateTenantPermission(TenantPermission[2], TenantPermissionSet."Role ID", AllObj[2]);
+        TenantPermission[2]."Execute Permission" := TenantPermission[2]."Execute Permission"::Indirect;
+        TenantPermission[2].Modify();
+
+        CreateAccessControl(AccessControl, TestUser."User Security ID", TestUser."User Name", TenantPermissionSet."Role ID");
+
+        EffectivePermissionBuffer.SetFilter("Object ID", '%1|%2', TenantPermission[1]."Object ID", TenantPermission[2]."Object ID");
+        EffectivePermissionBuffer.SetFilter("Object Type", '%1|%2', TenantPermission[1]."Object Type", TenantPermission[2]."Object Type");
+        EffectivePermissionBuffer.SetRange("User Name", TestUser."User Name");
+
+        RequestPageXML := Report.RunRequestPage(Report::"Effective Permissions Overview", RequestPageXML);
+
+        LibraryReportDataset.RunReportAndLoad(Report::"Effective Permissions Overview", EffectivePermissionBuffer, RequestPageXML);
+
+        LibraryReportDataset.MoveToRow(LibraryReportDataset.FindRow('ObjectName', Format(AllObj[1]."Object Name")) + 1);
+        LibraryReportDataset.AssertCurrentRowValueEquals('DeletePermission', Format(TenantPermission[1]."Delete Permission"));
+
+        LibraryReportDataset.MoveToRow(LibraryReportDataset.FindRow('ObjectName', Format(AllObj[2]."Object Name")) + 1);
+        LibraryReportDataset.AssertCurrentRowValueEquals('ExecutePermission', Format(TenantPermission[2]."Execute Permission"));
+
+        Clear(LibraryReportDataset);
     end;
 
     [Test]
@@ -1216,6 +1242,28 @@ codeunit 139400 "Permissions Test"
         TenantPermissionSet.Insert();
     end;
 
+    local procedure CreateTenantPermission(var TenantPermission: Record "Tenant Permission"; RoleID: Code[20]; AllObj: Record AllObj)
+    begin
+        TenantPermission.Init();
+        TenantPermission."App ID" := NullGuid;
+        TenantPermission."Role ID" := RoleID;
+        TenantPermission."Object Type" := AllObj."Object Type";
+        TenantPermission."Object ID" := AllObj."Object ID";
+        TenantPermission.Insert();
+    end;
+
+    local procedure CreateAccessControl(var AccessControl: Record "Access Control"; UserSecurityID: Guid; UserName: Text[50]; RoleID: Code[20])
+    begin
+        AccessControl.Init();
+        AccessControl."App ID" := NullGuid;
+        AccessControl."Role ID" := RoleID;
+        AccessControl."User Security ID" := UserSecurityID;
+        AccessControl."User Name" := UserName;
+        AccessControl."Company Name" := GetCurrentCompanyName();
+        AccessControl.Scope := AccessControl.Scope::Tenant;
+        AccessControl.Insert(true);
+    end;
+
     local procedure GetCurrentCompanyName(): Text[30]
     var
         AccessControl: Record "Access Control";
@@ -1253,6 +1301,12 @@ codeunit 139400 "Permissions Test"
     [MessageHandler]
     [Scope('OnPrem')]
     procedure MessageHandlerSimple(MessageText: Text[1024])
+    begin
+    end;
+
+    [RequestPageHandler]
+    [Scope('OnPrem')]
+    procedure EffectivePermissionsOverviewRequestPageHandler(var EffectivePermissionsOverview: TestRequestPage "Effective Permissions Overview")
     begin
     end;
 }
