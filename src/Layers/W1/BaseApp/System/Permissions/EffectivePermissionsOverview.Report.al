@@ -60,7 +60,7 @@ report 8314 "Effective Permissions Overview"
 
             trigger OnPreDataItem()
             var
-                ObjTypeFilter: Option " ","Table Data","Table",,"Report",,"Codeunit","XMLport",MenuSuite,"Page","Query",System;
+                ObjTypeFilter: Option;
             begin
                 if EffectivePermission.GetFilter("Object Type") <> '' then
                     ObjTypeFilter := EffectivePermission."Object Type";

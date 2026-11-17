@@ -194,7 +194,7 @@ page 9886 "Effective Permissions Overview"
 
                 trigger OnAction()
                 var
-                    ObjectTypeFilter: Option " ","Table Data","Table",,"Report",,"Codeunit","XMLport",MenuSuite,"Page","Query",System;
+                    ObjectTypeFilter: Option;
                 begin
                     if ObjTypeFilter <> ObjTypeFilter::" " then
                         ObjectTypeFilter := ObjTypeFilter - 1;
