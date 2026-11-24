@@ -184,7 +184,7 @@ codeunit 9852 "Effective Permissions Mgt."
             repeat
                 CurrentPermissionSet += 1;
                 ProgressBar.Update(StrSubstNo(ProgressLbl, CurrentPermissionSet, TotalPermissionSets));
-                PermissionConflictsOverview.PermissionSetID := CopyStr(MetadataPermissionSet."Role ID", 1, 20); // Assignable permission sets are always limited to length 20 
+                PermissionConflictsOverview.PermissionSetID := CopyStr(MetadataPermissionSet."Role ID", 1, 20); // Assignable permission sets are always limited to length 20
                 PermissionConflictsOverview.Type := PermissionConflictsOverview.Type::System;
                 if PlansExist.ContainsKey(PlanIds.GetBasicPlanId()) then
                     PermissionConflictsOverview.Basic := IsPermissionSetCoveredByLicense(PlanOrRole::Basic, MetadataPermissionSet."Role ID", PermissionConflictsOverview.Type::System);
@@ -906,6 +906,98 @@ codeunit 9852 "Effective Permissions Mgt."
             exit(true);
 
         exit(false);
+    end;
+
+    procedure LoadUsers(var TempUser: Record User temporary)
+    var
+        User: Record User;
+        UserProperty: Record "User Property";
+        EnvironmentInfo: Codeunit "Environment Information";
+        UserSelection: Codeunit "User Selection";
+        AzureADUserManagement: Codeunit "Azure AD User Management";
+        IsSaaS: Boolean;
+    begin
+        IsSaaS := EnvironmentInfo.IsSaaSInfrastructure();
+        TempUser.Reset();
+        TempUser.DeleteAll();
+        UserProperty.SetLoadFields("Authentication Object ID");
+        UserSelection.FilterSystemUserAndGroupUsers(User);
+        User.SetLoadFields("User Security ID", "User Name");
+        if User.FindSet() then
+            repeat
+                if IsSaaS then
+                    if not AzureADUserManagement.IsUserDelegated(User."User Security ID") then
+                        if (not UserProperty.Get(User."User Security ID")) or (UserProperty."Authentication Object ID" = '') then
+                            continue;
+
+                TempUser."User Security ID" := User."User Security ID";
+                TempUser."User Name" := User."User Name";
+                TempUser.Insert();
+            until User.Next() = 0;
+    end;
+
+    procedure LoadData(var EffectivePermission: Record "Effective Permission Buffer"; var TempUser: Record User temporary;
+        UserFilter: Text; ObjTypeFilter: Option " ","Table Data","Table",,"Report",,"Codeunit","XMLport",MenuSuite,"Page","Query",System;
+        ObjIDFilter: Text; CompanyFilter: Text[30])
+    var
+        AllObj: Record AllObj;
+        TempPermission: Record Permission temporary;
+        Window: Dialog;
+        ProcessCount, TotalCount : Integer;
+        LastUpdateDateTime: DateTime;
+        LoadDataMsg: Label 'Reading Permissions...@1@@@@@';
+    begin
+        LoadUsers(TempUser);
+        TempUser.Reset();
+        TempUser.SetFilter("User Name", UserFilter);
+        if TempUser.IsEmpty() then
+            exit;
+
+        AllObj.SetLoadFields("Object Type", "Object ID", "Object Name");
+        if ObjTypeFilter <> ObjTypeFilter::" " then
+            AllObj.SetRange("Object Type", ObjTypeFilter);
+        AllObj.SetFilter("Object ID", ObjIDFilter);
+        if not AllObj.FindSet() then
+            exit;
+
+        if GuiAllowed then begin
+            Window.Open(LoadDataMsg);
+
+            TotalCount := AllObj.Count() * TempUser.Count();
+            LastUpdateDateTime := CurrentDateTime();
+        end;
+        repeat
+            TempUser.FindSet();
+            repeat
+                PopulatePermissionRecordWithEffectivePermissionsForObject(
+                    TempPermission, TempUser."User Security ID", CompanyFilter, AllObj."Object Type", AllObj."Object ID");
+
+                EffectivePermission.Init();
+                EffectivePermission.Company := CompanyFilter;
+                EffectivePermission."User Name" := TempUser."User Name";
+                EffectivePermission."User Security ID" := TempUser."User Security ID";
+                EffectivePermission."Object Type" := AllObj."Object Type";
+                EffectivePermission."Object ID" := AllObj."Object ID";
+                EffectivePermission."Object Name" := AllObj."Object Name";
+                EffectivePermission."Read Permission" := TempPermission."Read Permission";
+                EffectivePermission."Insert Permission" := TempPermission."Insert Permission";
+                EffectivePermission."Modify Permission" := TempPermission."Modify Permission";
+                EffectivePermission."Delete Permission" := TempPermission."Delete Permission";
+                EffectivePermission."Execute Permission" := TempPermission."Execute Permission";
+                if EffectivePermission.Insert() then;
+
+                ProcessCount += 1;
+                if GuiAllowed then
+                    if CurrentDateTime() - LastUpdateDateTime > 1000 then begin
+                        Window.Update(1, Round(ProcessCount * 10000 / TotalCount, 1));
+                        LastUpdateDateTime := CurrentDateTime();
+                    end;
+            until TempUser.Next() = 0;
+        until AllObj.Next() = 0;
+        if EffectivePermission.FindFirst() then;
+
+        if GuiAllowed then
+            Window.Close();
     end;
 
     [EventSubscriber(ObjectType::Page, Page::"My Notifications", 'OnInitializingNotificationWithDefaultState', '', false, false)]
