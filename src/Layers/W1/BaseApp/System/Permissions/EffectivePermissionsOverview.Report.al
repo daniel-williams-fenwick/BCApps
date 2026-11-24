@@ -156,7 +156,12 @@ report 8314 "Effective Permissions Overview"
     end;
 
     trigger OnPreReport()
+    var
+        NoCompanyLbl: Label 'You must specify a company to run this report.';
     begin
+        if CompanyFilter = '' then
+            Error(NoCompanyLbl);
+
         EffectivePermissionsMgt.DisallowViewingEffectivePermissionsForNonAdminUsers(UserSecurityId());
 
         UpdateRequestPageFilterValues();

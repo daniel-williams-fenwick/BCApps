@@ -218,7 +218,7 @@ page 9886 "Effective Permissions Overview"
                     TempPermissionView.SetRange(Company);
                     EffectivePermissionsReport.SetTableView(TempPermissionView);
                     EffectivePermissionsReport.SetCompanyFilter(CompanyFilter);
-                    EffectivePermissionsReport.RunModal();
+                    EffectivePermissionsReport.Run();
                 end;
             }
             action(PermissionSets)
